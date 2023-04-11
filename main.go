@@ -5,7 +5,10 @@ import (
 	"golang.org/x/net/html"
 	"net/http"
 	"os"
+	"strings"
 )
+
+var selectors = map[string]int{}
 
 func main() {
 	for _, url := range os.Args[1:] {
@@ -29,9 +32,6 @@ func findLinks(url string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-<<<<<<< Updated upstream
-	outline(nil, doc)
-=======
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("Resp code %d\t%s\t%s", resp.StatusCode, url, resp.Status)
@@ -41,16 +41,27 @@ func findLinks(url string) ([]string, error) {
 		return nil, fmt.Errorf("Invalid HTML parse %s\t%v", url, err)
 	}
 	return visit(nil, doc), nil
->>>>>>> Stashed changes
 }
 
-func outline(stack []string, n *html.Node) []string {
+func visit(links []string, n *html.Node) []string {
+	if n.Type == html.ElementNode && n.Data == "a" {
+		for _, a := range n.Attr {
+			if a.Key == "href" {
+				links = append(links, a.Val)
+			}
+		}
+	}
 	if n.Type == html.ElementNode {
-		stack = append(stack, n.Data)
-		fmt.Println(stack)
+		selectors[n.Data]++
+	}
+	if n.Parent != nil {
+		t := strings.TrimSpace(n.Data)
+		if n.Parent.Data != "script" && n.Parent.Data != "style" && n.Type == html.TextNode && t != "" {
+			fmt.Printf("%s\n", n.Data)
+		}
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		stack = outline(stack, c)
+		links = visit(links, c)
 	}
-	return stack
+	return links
 }
