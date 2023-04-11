@@ -5,14 +5,20 @@ import (
 	"golang.org/x/net/html"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 )
 
 var selectors = map[string]int{}
 
+type Counter struct {
+	Images, Words int
+}
+
 func main() {
+	c := new(Counter)
 	for _, url := range os.Args[1:] {
-		links, err := findLinks(url)
+		links, err := findLinks(url, c)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FindLinks %s\t%v", url, err)
 			continue
@@ -24,10 +30,11 @@ func main() {
 		for t, c := range selectors {
 			fmt.Printf("%s %d\n", t, c)
 		}
+		fmt.Printf("Words count: %d\tImages count: %d\n", c.Words, c.Images)
 	}
 }
 
-func findLinks(url string) ([]string, error) {
+func findLinks(url string, c *Counter) ([]string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -40,10 +47,10 @@ func findLinks(url string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Invalid HTML parse %s\t%v", url, err)
 	}
-	return visit(nil, doc), nil
+	return visit(nil, c, doc), nil
 }
 
-func visit(links []string, n *html.Node) []string {
+func visit(links []string, count *Counter, n *html.Node) []string {
 	if n.Type == html.ElementNode && n.Data == "a" {
 		for _, a := range n.Attr {
 			if a.Key == "href" {
@@ -61,7 +68,19 @@ func visit(links []string, n *html.Node) []string {
 		}
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		links = visit(links, c)
+		links = visit(links, count, c)
+		countWordsAndImages(c, count)
+
 	}
 	return links
+}
+
+func countWordsAndImages(n *html.Node, c *Counter) {
+	if n.Type == html.ElementNode && n.Data == "img" {
+		c.Images++
+	}
+	if n.Type == html.TextNode {
+		t := strings.TrimSpace(n.Data)
+		c.Words += len(regexp.MustCompile(`\ss`).Split(t, -1))
+	}
 }
