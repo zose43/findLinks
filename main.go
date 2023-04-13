@@ -6,6 +6,7 @@ import (
 	"golang.org/x/net/html"
 	"net/http"
 	"os"
+	"strings"
 )
 
 var depth int
@@ -49,14 +50,36 @@ func forEachNode(n *html.Node, pre, post func(n *html.Node)) {
 
 func startElement(n *html.Node) {
 	if n.Type == html.ElementNode {
-		fmt.Printf("%*s<%s>\n", depth*2, "", n.Data)
-		depth++
+		if closeTag(n) {
+			fmt.Printf("%*s<%s %s/>\n", depth*2, "", n.Data, printAttrs(n.Attr))
+		} else {
+			fmt.Printf("%*s<%s %s>\n", depth*2, "", n.Data, printAttrs(n.Attr))
+			depth++
+		}
+	}
+	if n.Type == html.TextNode && strings.TrimSpace(n.Data) != "" {
+		fmt.Printf("%*s%s\n", depth*2, "", n.Data)
 	}
 }
 
 func endElement(n *html.Node) {
-	if n.Type == html.ElementNode {
+	if n.Type == html.ElementNode && !closeTag(n) {
 		depth--
 		fmt.Printf("%*s</%s>\n", depth*2, "", n.Data)
 	}
+}
+
+func printAttrs(attrs []html.Attribute) string {
+	attr := ""
+	for _, item := range attrs {
+		attr += fmt.Sprintf("%s=\"%s\" ", item.Key, item.Val)
+	}
+	return attr
+}
+
+func closeTag(n *html.Node) bool {
+	if n.FirstChild == nil && n.NextSibling != nil && strings.TrimSpace(n.NextSibling.Data) == "" {
+		return true
+	}
+	return false
 }
